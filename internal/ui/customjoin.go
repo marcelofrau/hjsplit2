@@ -33,7 +33,7 @@ type customJoinUI struct {
 
 func ShowCustomJoin(parent fyne.Window) {
 	win := globalApp.NewWindow("Custom Join")
-	win.Resize(fyne.NewSize(600, 500))
+	win.Resize(fyne.NewSize(640, 500))
 
 	ui := &customJoinUI{parent: parent, win: win, selected: -1}
 	ui.build()
@@ -44,6 +44,8 @@ func ShowCustomJoin(parent fyne.Window) {
 		}
 	})
 
+	// Center before showing
+	win.CenterOnScreen()
 	win.Show()
 }
 
@@ -112,7 +114,7 @@ func (ui *customJoinUI) build() {
 	ui.progress = widget.NewProgressBar()
 	ui.progress.Hidden = true
 
-	// Start / Abort buttons
+	// Start / Abort buttons (left side)
 	ui.startBtn = widget.NewButton("START JOIN", ui.startJoin)
 	ui.startBtn.Importance = widget.HighImportance
 
@@ -120,8 +122,21 @@ func (ui *customJoinUI) build() {
 	ui.abortBtn.Importance = widget.DangerImportance
 	ui.abortBtn.Hide()
 
-	btnArea := container.NewHBox(layout.NewSpacer(), ui.startBtn, layout.NewSpacer())
-	abortArea := container.NewHBox(layout.NewSpacer(), ui.abortBtn, layout.NewSpacer())
+	leftCol := container.NewVBox(
+		ui.startBtn,
+		ui.abortBtn,
+	)
+
+	// Drop zone (right side)
+	dropLabel := widget.NewLabelWithStyle("⬇\nDrop files here", fyne.TextAlignCenter, fyne.TextStyle{})
+	dropLabel.Wrapping = fyne.TextWrapWord
+	dropZone := widget.NewCard("", "",
+		container.NewCenter(container.NewPadded(dropLabel)))
+
+	// Bottom area: left (buttons) + right (drop zone)
+	bottomRow := container.NewGridWithColumns(2,
+		container.NewHBox(leftCol, layout.NewSpacer()),
+		dropZone)
 
 	// Main content
 	content := container.NewBorder(
@@ -133,8 +148,7 @@ func (ui *customJoinUI) build() {
 			outputRow,
 			ui.progress,
 			ui.status,
-			btnArea,
-			abortArea,
+			bottomRow,
 		),
 	)
 

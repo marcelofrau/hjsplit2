@@ -20,6 +20,7 @@ ___  ___        ___  ________  ________  ___       ___  _________   _______
   <img src="https://img.shields.io/badge/License-GPLv3-red" alt="License">
   <img src="https://img.shields.io/badge/GUI-Fyne-cyan" alt="GUI">
   <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status">
+  <img src="https://img.shields.io/github/v/release/marcelofrau/hjsplit2" alt="Release">
 </p>
 
 ---

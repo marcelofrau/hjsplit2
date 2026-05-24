@@ -303,7 +303,7 @@ func (ui *customJoinUI) startJoin() {
 		}
 		ui.finishJoin(err, dest)
 		if err == nil {
-			ui.askDeleteSources()
+			ui.showSuccessAndClose(dest)
 		}
 	}()
 }
@@ -323,19 +323,30 @@ func (ui *customJoinUI) abortOp() {
 	confirm.Show()
 }
 
-func (ui *customJoinUI) askDeleteSources() {
+func (ui *customJoinUI) showSuccessAndClose(dest string) {
+	dlg := dialog.NewConfirm("Join completed",
+		fmt.Sprintf("Files joined successfully!\nOutput: %s", filepath.Base(dest)),
+		func(bool) {
+			ui.askDeleteAndClose()
+		}, ui.win)
+	dlg.SetConfirmText("OK")
+	dlg.Show()
+}
+
+func (ui *customJoinUI) askDeleteAndClose() {
 	if len(ui.files) == 0 {
+		ui.win.Close()
 		return
 	}
 	dialog.NewConfirm("Delete source files",
 		fmt.Sprintf("Delete the %d source file(s) after joining?", len(ui.files)),
 		func(ok bool) {
-			if !ok {
-				return
+			if ok {
+				for _, p := range ui.files {
+					os.Remove(p)
+				}
 			}
-			for _, p := range ui.files {
-				os.Remove(p)
-			}
+			ui.win.Close()
 		}, ui.win).Show()
 }
 

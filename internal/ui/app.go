@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -20,9 +21,11 @@ import (
 
 var appIcon fyne.Resource
 var appIconAbout fyne.Resource
+var globalApp fyne.App
 
 func Run(iconData, aboutIconData []byte) {
 	a := app.New()
+	globalApp = a
 	a.Settings().SetTheme(&synthwaveTheme{})
 
 	if iconData != nil {
@@ -304,6 +307,9 @@ func (ui *appUI) runJoin() {
 			ui.log("Aborted. Output file removed.")
 		}
 		ui.finishOp(ui.joinBtn, fmt.Sprintf("Joined: %s", filepath.Base(joined)), err)
+		if err == nil {
+			ui.askDeleteParts(ui.filePath)
+		}
 	}()
 }
 
@@ -334,6 +340,37 @@ func (ui *appUI) finishOp(btn *widget.Button, msg string, err error) {
 	}
 	btn.Enable()
 	ui.cancel = nil
+}
+
+func (ui *appUI) askDeleteParts(firstPart string) {
+	basePath := strings.TrimSuffix(firstPart, ".001")
+	if basePath == firstPart {
+		return
+	}
+	var parts []string
+	for i := 1; ; i++ {
+		p := fmt.Sprintf("%s.%03d", basePath, i)
+		if _, err := os.Stat(p); err != nil {
+			break
+		}
+		parts = append(parts, p)
+	}
+	if len(parts) == 0 {
+		return
+	}
+
+	dialog.NewConfirm("Delete source files",
+		fmt.Sprintf("Delete the %d part file(s) after joining?", len(parts)),
+		func(ok bool) {
+			if !ok {
+				return
+			}
+			for _, p := range parts {
+				os.Remove(p)
+				ui.log("Deleted: %s", filepath.Base(p))
+			}
+			ui.log("Source files removed.")
+		}, ui.window).Show()
 }
 
 func unitMul(unit string) int64 {

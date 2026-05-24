@@ -19,6 +19,7 @@ import (
 
 type customJoinUI struct {
 	parent    fyne.Window
+	win       fyne.Window
 	files     []string
 	selected  int
 	list      *widget.List
@@ -31,8 +32,19 @@ type customJoinUI struct {
 }
 
 func ShowCustomJoin(parent fyne.Window) {
-	ui := &customJoinUI{parent: parent, selected: -1}
+	win := globalApp.NewWindow("Custom Join")
+	win.Resize(fyne.NewSize(600, 500))
+
+	ui := &customJoinUI{parent: parent, win: win, selected: -1}
 	ui.build()
+
+	win.SetOnDropped(func(_ fyne.Position, uris []fyne.URI) {
+		for _, u := range uris {
+			ui.addSingleFile(u.Path())
+		}
+	})
+
+	win.Show()
 }
 
 func (ui *customJoinUI) build() {
@@ -52,16 +64,33 @@ func (ui *customJoinUI) build() {
 		ui.selected = -1
 	}
 
-	listCard := widget.NewCard("Files to join (order matters)", "", container.NewPadded(ui.list))
+	// Navigation buttons alongside list
+	moveTop := widget.NewButton("⤒", func() { ui.moveTop() })
+	moveUp := widget.NewButton("↑", func() { ui.moveUp() })
+	moveDown := widget.NewButton("↓", func() { ui.moveDown() })
+	moveBottom := widget.NewButton("⤓", func() { ui.moveBottom() })
 
+	navCol := container.NewVBox(
+		moveTop,
+		moveUp,
+		layout.NewSpacer(),
+		moveDown,
+		moveBottom,
+	)
+
+	listRow := container.NewBorder(nil, nil, nil, navCol, ui.list)
+
+	listCard := widget.NewCard("Files to join (order matters)", "",
+		container.NewPadded(listRow))
+
+	// Bottom buttons
 	addBtn := widget.NewButton("Add files...", ui.addFiles)
 	removeBtn := widget.NewButton("Remove", ui.remove)
-	moveUp := widget.NewButton("↑", ui.moveUp)
-	moveDown := widget.NewButton("↓", ui.moveDown)
 	sortBtn := widget.NewButton("Sort", ui.autoSort)
 
-	btnRow := container.NewHBox(addBtn, removeBtn, layout.NewSpacer(), moveUp, moveDown, sortBtn)
+	btnRow := container.NewHBox(addBtn, removeBtn, layout.NewSpacer(), sortBtn)
 
+	// Output
 	ui.output = widget.NewEntry()
 	browseBtn := widget.NewButton("Browse...", func() {
 		d := dialog.NewFileSave(func(w fyne.URIWriteCloser, err error) {
@@ -69,18 +98,21 @@ func (ui *customJoinUI) build() {
 				ui.output.SetText(w.URI().Path())
 				w.Close()
 			}
-		}, ui.parent)
+		}, ui.win)
 		d.Resize(fyne.NewSize(700, 500))
 		d.Show()
 	})
-	outputRow := container.NewHBox(widget.NewLabel("Output:"), ui.output, browseBtn)
+	outputRow := container.NewBorder(nil, nil, widget.NewLabel("Output:"), browseBtn, ui.output)
 
+	// Status
 	ui.status = widget.NewLabel("")
 	ui.status.Alignment = fyne.TextAlignCenter
 
+	// Progress
 	ui.progress = widget.NewProgressBar()
 	ui.progress.Hidden = true
 
+	// Start / Abort buttons
 	ui.startBtn = widget.NewButton("START JOIN", ui.startJoin)
 	ui.startBtn.Importance = widget.HighImportance
 
@@ -91,6 +123,7 @@ func (ui *customJoinUI) build() {
 	btnArea := container.NewHBox(layout.NewSpacer(), ui.startBtn, layout.NewSpacer())
 	abortArea := container.NewHBox(layout.NewSpacer(), ui.abortBtn, layout.NewSpacer())
 
+	// Main content
 	content := container.NewBorder(
 		nil, nil,
 		nil, nil,
@@ -105,9 +138,7 @@ func (ui *customJoinUI) build() {
 		),
 	)
 
-	d := dialog.NewCustom("Custom Join", "Close", content, ui.parent)
-	d.Resize(fyne.NewSize(560, 480))
-	d.Show()
+	ui.win.SetContent(content)
 }
 
 func (ui *customJoinUI) addFiles() {
@@ -119,7 +150,7 @@ func (ui *customJoinUI) addFiles() {
 		r.Close()
 		ui.addSingleFile(path)
 		ui.addFiles()
-	}, ui.parent)
+	}, ui.win)
 	d.Resize(fyne.NewSize(700, 500))
 	d.Show()
 }
@@ -147,6 +178,18 @@ func (ui *customJoinUI) remove() {
 	ui.list.Refresh()
 }
 
+func (ui *customJoinUI) moveTop() {
+	if ui.selected <= 0 {
+		return
+	}
+	f := ui.files[ui.selected]
+	ui.files = append(ui.files[:ui.selected], ui.files[ui.selected+1:]...)
+	ui.files = append([]string{f}, ui.files...)
+	ui.selected = 0
+	ui.list.Refresh()
+	ui.list.Select(ui.selected)
+}
+
 func (ui *customJoinUI) moveUp() {
 	if ui.selected <= 0 || ui.selected >= len(ui.files) {
 		return
@@ -165,6 +208,18 @@ func (ui *customJoinUI) moveDown() {
 	i := ui.selected
 	ui.files[i], ui.files[i+1] = ui.files[i+1], ui.files[i]
 	ui.selected = i + 1
+	ui.list.Refresh()
+	ui.list.Select(ui.selected)
+}
+
+func (ui *customJoinUI) moveBottom() {
+	if ui.selected < 0 || ui.selected >= len(ui.files)-1 {
+		return
+	}
+	f := ui.files[ui.selected]
+	ui.files = append(ui.files[:ui.selected], ui.files[ui.selected+1:]...)
+	ui.files = append(ui.files, f)
+	ui.selected = len(ui.files) - 1
 	ui.list.Refresh()
 	ui.list.Select(ui.selected)
 }
@@ -195,18 +250,18 @@ func (ui *customJoinUI) guessOutput() {
 
 func (ui *customJoinUI) startJoin() {
 	if len(ui.files) == 0 {
-		dialog.ShowInformation("No files", "Add at least one file to join.", ui.parent)
+		dialog.ShowInformation("No files", "Add at least one file to join.", ui.win)
 		return
 	}
 	dest := ui.output.Text
 	if dest == "" {
-		dialog.ShowInformation("No output", "Specify an output file path.", ui.parent)
+		dialog.ShowInformation("No output", "Specify an output file path.", ui.win)
 		return
 	}
 
 	for _, f := range ui.files {
 		if _, err := os.Stat(f); os.IsNotExist(err) {
-			dialog.ShowError(fmt.Errorf("file not found: %s", filepath.Base(f)), ui.parent)
+			dialog.ShowError(fmt.Errorf("file not found: %s", filepath.Base(f)), ui.win)
 			return
 		}
 	}
@@ -230,6 +285,9 @@ func (ui *customJoinUI) startJoin() {
 			ui.status.SetText("Aborted. Output file removed.")
 		}
 		ui.finishJoin(err, dest)
+		if err == nil {
+			ui.askDeleteSources()
+		}
 	}()
 }
 
@@ -244,8 +302,24 @@ func (ui *customJoinUI) abortOp() {
 				ui.cancel()
 				ui.cancel = nil
 			}
-		}, ui.parent)
+		}, ui.win)
 	confirm.Show()
+}
+
+func (ui *customJoinUI) askDeleteSources() {
+	if len(ui.files) == 0 {
+		return
+	}
+	dialog.NewConfirm("Delete source files",
+		fmt.Sprintf("Delete the %d source file(s) after joining?", len(ui.files)),
+		func(ok bool) {
+			if !ok {
+				return
+			}
+			for _, p := range ui.files {
+				os.Remove(p)
+			}
+		}, ui.win).Show()
 }
 
 func (ui *customJoinUI) finishJoin(err error, dest string) {

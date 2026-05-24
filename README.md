@@ -1,9 +1,12 @@
 <pre align="center">
- __  __      _       _     _   ____  _ _   _ _____
-|  \/  | ___| |_ ___| | __| | |  _ \| | | | | ____|
-| |\/| |/ _ \ __/ __| |/ _` | | |_) | | |_| |  _|
-| |  | |  __/ || (__| | (_| | |  __/| |  _  | |___
-|_|  |_|\___|\__\___|_|\__,_| |_|   |_|_| |_|_____|
+___  ___        ___  ________  ________  ___       ___  _________   _______     
+|\  \|\  \      |\  \|\   ____\|\   __  \|\  \     |\  \|\___   ___\/  ___  \    
+\ \  \\\  \     \ \  \ \  \___|\ \  \|\  \ \  \    \ \  \|___ \  \_/__/|_/  /|   
+ \ \   __  \  __ \ \  \ \_____  \ \   ____\ \  \    \ \  \   \ \  \|__|//  / /   
+  \ \  \ \  \|\  \\_\  \|____|\  \ \  \___|\ \  \____\ \  \   \ \  \   /  /_/__  
+   \ \__\ \__\ \________\____\_\  \ \__\    \ \_______\ \__\   \ \__\ |\________\
+    \|__|\|__|\|________|\_________\|__|     \|_______|\|__|    \|__|  \|_______|
+                        \|_________|
 </pre>
 
 <p align="center">
@@ -25,14 +28,15 @@
 
 **hjsplit2** is a modern, open-source replacement for the classic HJSplit utility. It lets you split large files into smaller chunks and rejoin them later — perfect for transferring big files over email, USB drives, or cloud storage with size limits.
 
-Built with **Go** and **Fyne** GUI toolkit, featuring a custom **Synthwave** theme.
+Built with **Go** and the **Fyne** GUI toolkit, featuring a dark navy/synthwave theme inspired by classic terminal aesthetics.
 
 ## Features
 
 - ✂️ **Split** — divide any file into custom-sized parts (`.001`, `.002`, ...)
 - 🔗 **Join** — merge split files back to the original
+- 🔀 **Custom Join** — join multiple files in any order via drag-and-drop list
 - 🖱️ **Drag & Drop** — drop files directly onto the window
-- 🎨 **Synthwave Theme** — dark purple, neon pink, and cyan aesthetics
+- 🎨 **Synthwave Theme** — dark navy, hot pink, and teal aesthetics
 - 🖥️ **Console Log** — real-time operation log with terminal-style output
 - 📦 **Portable** — single executable, no installation required
 - 🌍 **Cross-platform** — Windows, Linux, macOS
@@ -102,24 +106,32 @@ USE_UPX=true
 
 ## Usage
 
-1. Launch `hjsplit2`
-2. Choose **Split** or **Join** mode
-3. Drag a file onto the window (or click to browse)
-4. For Split: set the chunk size (KB, MB, or GB)
-5. Click **Split** or **Join**
+### Split
+1. Go to the **Split** tab
+2. Drag a file onto the window (or click to browse)
+3. Set the chunk size (KB, MB, or GB)
+4. Click **Split**
 
-Output files follow the `.001`, `.002`, ... naming convention, compatible with the original HJSplit format.
+### Join (auto-detect)
+1. Go to the **Join** tab
+2. Drag a `.001` file onto the window
+3. Click **Join** — automatically finds and merges `.001`, `.002`, ...
 
-## Screenshots
+### Custom Join (any order)
+1. Go to the **Join** tab
+2. Click **Custom Join...**
+3. Add files with **Add files...**, reorder with **↑ / ↓**
+4. Set the output path and click **START JOIN**
 
-*Main window with Synthwave theme and console log*
+Output files from Split follow the `.001`, `.002`, ... naming convention, compatible with the original HJSplit format.
 
 ## Tech Stack
 
 - **Language**: [Go](https://go.dev/)
 - **GUI**: [Fyne](https://fyne.io/) v2
-- **Theme**: Custom Synthwave
+- **Theme**: Custom Synthwave (Python‑inspired palette)
 - **Windowing**: GLFW via Fyne
+- **Original concept**: [HJSplit](http://www.hjsplit.org/)
 
 ## License
 

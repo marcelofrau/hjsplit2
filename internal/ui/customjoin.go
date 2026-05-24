@@ -3,12 +3,14 @@ package ui
 import (
 	"context"
 	"fmt"
+	"image/color"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
@@ -82,8 +84,10 @@ func (ui *customJoinUI) build() {
 
 	listRow := container.NewBorder(nil, nil, nil, navCol, ui.list)
 
-	listCard := widget.NewCard("Files to join (order matters)", "",
-		container.NewPadded(listRow))
+	listBg := canvas.NewRectangle(color.NRGBA{0x0b, 0x25, 0x48, 0xff})
+	listWithBg := container.NewStack(listBg, container.NewPadded(listRow))
+
+	listCard := widget.NewCard("Files to join (order matters)", "", listWithBg)
 
 	// Bottom buttons
 	addBtn := widget.NewButton("Add files...", ui.addFiles)
@@ -128,8 +132,7 @@ func (ui *customJoinUI) build() {
 	)
 
 	// Drop hint (left side)
-	dropHint := widget.NewLabelWithStyle("Tip: Drag and drop files\nonto this window to add them.", fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
-	dropHint.Wrapping = fyne.TextWrapWord
+	dropHint := widget.NewLabelWithStyle("Tip: Drag files anywhere onto this window", fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
 
 	// Bottom area: left (drop hint) + right (buttons)
 	bottomRow := container.NewGridWithColumns(2,

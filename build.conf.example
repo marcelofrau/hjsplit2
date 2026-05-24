@@ -1,0 +1,9 @@
+# Build configuration - copy to build.conf and edit paths
+#
+# MinGW 32-bit: uncomment and point to your 32-bit MinGW installation
+# MINGW32_PATH=C:/Apps/mingw32
+# Or specify the 32-bit compiler directly:
+# CC_386=i686-w64-mingw32-gcc
+#
+# WSL distro for Linux builds (optional, uses default if not set)
+# WSL_DISTRO=Ubuntu

@@ -1,0 +1,130 @@
+<pre align="center">
+ __  __      _       _     _   ____  _ _   _ _____
+|  \/  | ___| |_ ___| | __| | |  _ \| | | | | ____|
+| |\/| |/ _ \ __/ __| |/ _` | | |_) | | |_| |  _|
+| |  | |  __/ || (__| | (_| | |  __/| |  _  | |___
+|_|  |_|\___|\__\___|_|\__,_| |_|   |_|_| |_|_____|
+</pre>
+
+<p align="center">
+  <strong>A spiritual successor to HJSplit</strong><br>
+  <em>Fast, cross-platform file splitting and joining tool</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.21%2B-00ADD8?logo=go" alt="Go version">
+  <img src="https://img.shields.io/badge/Platform-Windows%20|%20Linux%20|%20macOS-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/License-GPLv3-red" alt="License">
+  <img src="https://img.shields.io/badge/GUI-Fyne-cyan" alt="GUI">
+  <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status">
+</p>
+
+---
+
+## Overview
+
+**hjsplit2** is a modern, open-source replacement for the classic HJSplit utility. It lets you split large files into smaller chunks and rejoin them later — perfect for transferring big files over email, USB drives, or cloud storage with size limits.
+
+Built with **Go** and **Fyne** GUI toolkit, featuring a custom **Synthwave** theme.
+
+## Features
+
+- ✂️ **Split** — divide any file into custom-sized parts (`.001`, `.002`, ...)
+- 🔗 **Join** — merge split files back to the original
+- 🖱️ **Drag & Drop** — drop files directly onto the window
+- 🎨 **Synthwave Theme** — dark purple, neon pink, and cyan aesthetics
+- 🖥️ **Console Log** — real-time operation log with terminal-style output
+- 📦 **Portable** — single executable, no installation required
+- 🌍 **Cross-platform** — Windows, Linux, macOS
+
+## Downloads
+
+Pre-built binaries for Windows (32-bit and 64-bit) and Linux are available in the [dist](./dist) directory after building.
+
+| Platform | File |
+|----------|------|
+| Windows 64-bit | `hjsplit2-v*-windows-amd64.exe` |
+| Windows 32-bit | `hjsplit2-v*-windows-386.exe` |
+| Linux 64-bit | `hjsplit2-v*-linux-amd64` |
+
+## Building
+
+### Prerequisites
+
+- [Go](https://go.dev/dl/) 1.21 or later
+- [MinGW-w64](https://winlibs.com/) (Windows, for CGO/GLFW)
+- [UPX](https://upx.github.io/) (optional, for smaller binaries)
+
+### Quick build (native)
+
+```bash
+go build -ldflags="-s -w -H windowsgui" -o hjsplit2.exe .
+```
+
+### Using build scripts
+
+```powershell
+# Windows — build all platforms
+.\build.ps1 all
+
+# Build only for current platform
+.\build.ps1 native
+
+# Build specific targets
+.\build.ps1 win64
+.\build.ps1 win32         # requires MINGW32_PATH in build.conf
+.\build.ps1 linux          # requires WSL with Go installed
+```
+
+```bash
+# Linux / WSL
+./build.sh all
+./build.sh native
+./build.sh win64           # requires MinGW cross-compiler
+```
+
+### Cross-compilation notes
+
+The build scripts automatically detect available toolchains:
+
+- **win64**: uses system MinGW-w64 (64-bit)
+- **win32**: configure `MINGW32_PATH` or `CC_386` in `build.conf`
+- **Linux (from Windows)**: builds via WSL if Go is installed in WSL
+- **Linux (native)**: builds directly
+
+Configure paths in [`build.conf`](./build.conf) (copy from `build.conf.example`):
+
+```ini
+MINGW32_PATH=C:/Apps/mingw32
+WSL_DISTRO=Ubuntu
+USE_UPX=true
+```
+
+## Usage
+
+1. Launch `hjsplit2`
+2. Choose **Split** or **Join** mode
+3. Drag a file onto the window (or click to browse)
+4. For Split: set the chunk size (KB, MB, or GB)
+5. Click **Split** or **Join**
+
+Output files follow the `.001`, `.002`, ... naming convention, compatible with the original HJSplit format.
+
+## Screenshots
+
+*Main window with Synthwave theme and console log*
+
+## Tech Stack
+
+- **Language**: [Go](https://go.dev/)
+- **GUI**: [Fyne](https://fyne.io/) v2
+- **Theme**: Custom Synthwave
+- **Windowing**: GLFW via Fyne
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](./LICENSE) file for details.
+
+## Attribution
+
+<a target="_blank" href="https://icons8.com/icon/Msb7gOpzHHvG/split-files">Split</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a>

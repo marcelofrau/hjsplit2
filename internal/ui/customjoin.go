@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,7 +25,9 @@ type customJoinUI struct {
 	output    *widget.Entry
 	progress  *widget.ProgressBar
 	startBtn  *widget.Button
+	abortBtn  *widget.Button
 	status    *widget.Label
+	cancel    context.CancelFunc
 }
 
 func ShowCustomJoin(parent fyne.Window) {
@@ -81,6 +84,13 @@ func (ui *customJoinUI) build() {
 	ui.startBtn = widget.NewButton("START JOIN", ui.startJoin)
 	ui.startBtn.Importance = widget.HighImportance
 
+	ui.abortBtn = widget.NewButton("Abort", ui.abortOp)
+	ui.abortBtn.Importance = widget.DangerImportance
+	ui.abortBtn.Hide()
+
+	btnArea := container.NewHBox(layout.NewSpacer(), ui.startBtn, layout.NewSpacer())
+	abortArea := container.NewHBox(layout.NewSpacer(), ui.abortBtn, layout.NewSpacer())
+
 	content := container.NewBorder(
 		nil, nil,
 		nil, nil,
@@ -90,7 +100,8 @@ func (ui *customJoinUI) build() {
 			outputRow,
 			ui.progress,
 			ui.status,
-			container.NewHBox(layout.NewSpacer(), ui.startBtn, layout.NewSpacer()),
+			btnArea,
+			abortArea,
 		),
 	)
 
@@ -107,7 +118,6 @@ func (ui *customJoinUI) addFiles() {
 		path := r.URI().Path()
 		r.Close()
 		ui.addSingleFile(path)
-		// Keep adding more
 		ui.addFiles()
 	}, ui.parent)
 	d.Resize(fyne.NewSize(700, 500))
@@ -201,23 +211,54 @@ func (ui *customJoinUI) startJoin() {
 		}
 	}
 
-	ui.startBtn.Disable()
+	ui.startBtn.Hide()
+	ui.abortBtn.Show()
 	ui.progress.Hidden = false
 	ui.progress.SetValue(0)
 	ui.status.SetText(fmt.Sprintf("Joining %d files...", len(ui.files)))
 
+	ctx, cancel := context.WithCancel(context.Background())
+	ui.cancel = cancel
+
 	go func() {
-		err := core.JoinMulti(ui.files, dest, func(cur, total int64) {
+		err := core.JoinMulti(ctx, ui.files, dest, func(cur, total int64) {
 			if total > 0 {
 				ui.progress.SetValue(float64(cur) / float64(total))
 			}
 		})
-		if err != nil {
-			ui.status.SetText(fmt.Sprintf("Error: %v", err))
-		} else {
-			ui.progress.SetValue(1)
-			ui.status.SetText(fmt.Sprintf("Done! → %s", filepath.Base(dest)))
+		if err != nil && ctx.Err() != nil {
+			ui.status.SetText("Aborted. Output file removed.")
 		}
-		ui.startBtn.Enable()
+		ui.finishJoin(err, dest)
 	}()
+}
+
+func (ui *customJoinUI) abortOp() {
+	if ui.cancel == nil {
+		return
+	}
+	confirm := dialog.NewConfirm("Abort operation",
+		"Cancel the current join? The output file will be removed.",
+		func(ok bool) {
+			if ok {
+				ui.cancel()
+				ui.cancel = nil
+			}
+		}, ui.parent)
+	confirm.Show()
+}
+
+func (ui *customJoinUI) finishJoin(err error, dest string) {
+	ui.abortBtn.Hide()
+	ui.startBtn.Show()
+	if err != nil {
+		if ui.cancel == nil {
+			ui.status.SetText(fmt.Sprintf("Error: %v", err))
+		}
+	} else {
+		ui.progress.SetValue(1)
+		ui.status.SetText(fmt.Sprintf("Done! → %s", filepath.Base(dest)))
+	}
+	ui.startBtn.Enable()
+	ui.cancel = nil
 }

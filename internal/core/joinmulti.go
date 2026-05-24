@@ -1,12 +1,13 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 )
 
-func JoinMulti(files []string, outputPath string, progress func(current, total int64)) error {
+func JoinMulti(ctx context.Context, files []string, outputPath string, progress func(current, total int64)) error {
 	if len(files) == 0 {
 		return fmt.Errorf("no files provided")
 	}
@@ -30,12 +31,29 @@ func JoinMulti(files []string, outputPath string, progress func(current, total i
 	buf := make([]byte, 32*1024)
 
 	for _, part := range files {
+		select {
+		case <-ctx.Done():
+			outFile.Close()
+			os.Remove(outputPath)
+			return ctx.Err()
+		default:
+		}
+
 		partFile, err := os.Open(part)
 		if err != nil {
 			return fmt.Errorf("failed to open %s: %w", part, err)
 		}
 
 		for {
+			select {
+			case <-ctx.Done():
+				partFile.Close()
+				outFile.Close()
+				os.Remove(outputPath)
+				return ctx.Err()
+			default:
+			}
+
 			n, readErr := partFile.Read(buf)
 			if n > 0 {
 				if _, werr := outFile.Write(buf[:n]); werr != nil {

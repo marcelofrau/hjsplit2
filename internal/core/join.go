@@ -1,13 +1,14 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 )
 
-func Join(firstPartPath string, progress func(current, total int64)) (string, error) {
+func Join(ctx context.Context, firstPartPath string, progress func(current, total int64)) (string, error) {
 	basePath := stripPartSuffix(firstPartPath)
 	if basePath == firstPartPath {
 		return "", fmt.Errorf("file must have a .001 extension")
@@ -53,6 +54,14 @@ func Join(firstPartPath string, progress func(current, total int64)) (string, er
 
 	partNum = 1
 	for {
+		select {
+		case <-ctx.Done():
+			joinedFile.Close()
+			os.Remove(joinedPath)
+			return "", ctx.Err()
+		default:
+		}
+
 		partPath := fmt.Sprintf("%s.%03d", basePath, partNum)
 		partFile, err := os.Open(partPath)
 		if err != nil {
@@ -63,10 +72,21 @@ func Join(firstPartPath string, progress func(current, total int64)) (string, er
 		}
 
 		for {
+			select {
+			case <-ctx.Done():
+				partFile.Close()
+				joinedFile.Close()
+				os.Remove(joinedPath)
+				return "", ctx.Err()
+			default:
+			}
+
 			n, readErr := partFile.Read(buf)
 			if n > 0 {
 				if _, werr := joinedFile.Write(buf[:n]); werr != nil {
 					partFile.Close()
+					joinedFile.Close()
+					os.Remove(joinedPath)
 					return "", fmt.Errorf("failed to write joined file: %w", werr)
 				}
 				totalCopied += int64(n)
@@ -79,6 +99,8 @@ func Join(firstPartPath string, progress func(current, total int64)) (string, er
 			}
 			if readErr != nil {
 				partFile.Close()
+				joinedFile.Close()
+				os.Remove(joinedPath)
 				return "", fmt.Errorf("failed to read %s: %w", partPath, readErr)
 			}
 		}

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,15 +55,17 @@ type appUI struct {
 	window fyne.Window
 	tabs   *container.AppTabs
 
-	filePath  string
-	splitLabel *widget.Label
-	joinLabel  *widget.Label
-	sizeEntry *widget.Entry
-	unitSel   *widget.Select
-	splitBtn  *widget.Button
-	joinBtn   *widget.Button
-	progress  *widget.ProgressBar
-	console   *consoleWidget
+	filePath    string
+	splitLabel  *widget.Label
+	joinLabel   *widget.Label
+	sizeEntry   *widget.Entry
+	unitSel     *widget.Select
+	splitBtn    *widget.Button
+	joinBtn     *widget.Button
+	abortBtn    *widget.Button
+	progress    *widget.ProgressBar
+	console     *consoleWidget
+	cancel      context.CancelFunc
 }
 
 func (ui *appUI) log(format string, args ...any) {
@@ -99,7 +102,7 @@ func (ui *appUI) buildGUI() {
 
 	// ── Split tab ──────────────────────────────────────────────
 	ui.sizeEntry = widget.NewEntry()
-	ui.sizeEntry.SetText("5")
+	ui.sizeEntry.SetText("200")
 	ui.unitSel = widget.NewSelect([]string{"KB", "MB", "GB"}, nil)
 	ui.unitSel.SetSelected("MB")
 
@@ -144,6 +147,13 @@ func (ui *appUI) buildGUI() {
 		container.NewTabItem("Join", joinContent),
 	)
 
+	// ── Abort button ───────────────────────────────────────────
+	ui.abortBtn = widget.NewButton("Abort", ui.abortOp)
+	ui.abortBtn.Importance = widget.DangerImportance
+	ui.abortBtn.Hide()
+
+	abortRow := container.NewHBox(layout.NewSpacer(), ui.abortBtn)
+
 	// ── Progress ───────────────────────────────────────────────
 	ui.progress = widget.NewProgressBar()
 	ui.progress.Hidden = true
@@ -153,7 +163,7 @@ func (ui *appUI) buildGUI() {
 	consolePadded := container.NewPadded(ui.console)
 
 	// ── Layout ─────────────────────────────────────────────────
-	topSection := container.NewVBox(ui.tabs, ui.progress)
+	topSection := container.NewVBox(ui.tabs, ui.progress, abortRow)
 
 	content := container.NewBorder(
 		topSection,
@@ -194,53 +204,128 @@ func (ui *appUI) startOp() {
 		return
 	}
 
-	if _, err := os.Stat(ui.filePath); os.IsNotExist(err) {
+	info, err := os.Stat(ui.filePath)
+	if err != nil {
 		dialog.ShowError(fmt.Errorf("file not found: %s", ui.filePath), ui.window)
 		return
 	}
 
-	ui.progress.SetValue(0)
-	ui.progress.Hidden = false
+	fileSize := info.Size()
 
 	if ui.tabs.SelectedIndex() == 0 {
-		// Split
-		ui.splitBtn.Disable()
-
+		// ── Split mode ────────────────────────────────────────
 		sizeVal, err := strconv.ParseInt(ui.sizeEntry.Text, 10, 64)
 		if err != nil || sizeVal <= 0 {
 			dialog.ShowError(fmt.Errorf("enter a positive number for chunk size"), ui.window)
-			ui.splitBtn.Enable()
-			ui.progress.Hidden = true
 			return
 		}
 		chunkSize := sizeVal * unitMul(ui.unitSel.Selected)
 
-		ui.log("Splitting: %s (%d %s chunks)", filepath.Base(ui.filePath), sizeVal, ui.unitSel.Selected)
-		go func() {
-			parts, err := core.Split(ui.filePath, chunkSize, func(cur, total int64) {
-				if total > 0 {
-					ui.progress.SetValue(float64(cur) / float64(total))
-				}
-			})
-			ui.finishOp(ui.splitBtn, fmt.Sprintf("Split into %d parts", len(parts)), err)
-		}()
-	} else {
-		// Join
-		ui.joinBtn.Disable()
+		if chunkSize <= 0 {
+			dialog.ShowError(fmt.Errorf("invalid chunk size"), ui.window)
+			return
+		}
 
-		ui.log("Joining: %s", filepath.Base(ui.filePath))
-		go func() {
-			joined, err := core.Join(ui.filePath, func(cur, total int64) {
-				if total > 0 {
-					ui.progress.SetValue(float64(cur) / float64(total))
-				}
-			})
-			ui.finishOp(ui.joinBtn, fmt.Sprintf("Joined: %s", filepath.Base(joined)), err)
-		}()
+		if fileSize <= chunkSize {
+			dialog.ShowInformation("File too small",
+				fmt.Sprintf("The file (%s) is smaller than the chunk size (%d %s). Nothing to split.",
+					fmtBytes(fileSize), sizeVal, ui.unitSel.Selected), ui.window)
+			return
+		}
+
+		estimatedParts := int((fileSize + chunkSize - 1) / chunkSize)
+		if estimatedParts > 20 {
+			suggestedMB := int(fileSize / (20 * 1024 * 1024))
+			if suggestedMB < 1 {
+				suggestedMB = 1
+			}
+			confirm := dialog.NewConfirm("Many parts",
+				fmt.Sprintf("This will create %d parts.\nRecommended: increase chunk size to at least %d MB.\n\nContinue anyway?", estimatedParts, suggestedMB),
+				func(ok bool) {
+					if ok {
+						ui.runSplit(chunkSize, fileSize)
+					}
+				}, ui.window)
+			confirm.Show()
+			return
+		}
+
+		ui.runSplit(chunkSize, fileSize)
+
+	} else {
+		// ── Join mode ─────────────────────────────────────────
+		ui.runJoin()
 	}
 }
 
+func (ui *appUI) runSplit(chunkSize int64, fileSize int64) {
+	ui.splitBtn.Hide()
+	ui.abortBtn.Show()
+	ui.progress.SetValue(0)
+	ui.progress.Hidden = false
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ui.cancel = cancel
+
+	ui.log("Splitting: %s (%s chunks of %s)",
+		filepath.Base(ui.filePath), ui.sizeEntry.Text, ui.unitSel.Selected)
+
+	go func() {
+		parts, err := core.Split(ctx, ui.filePath, chunkSize, func(cur, total int64) {
+			if total > 0 {
+				ui.progress.SetValue(float64(cur) / float64(total))
+			}
+		})
+		if err != nil && ctx.Err() != nil {
+			ui.log("Aborted. Partial files removed.")
+		}
+		ui.finishOp(ui.splitBtn, fmt.Sprintf("Split into %d parts", len(parts)), err)
+	}()
+}
+
+func (ui *appUI) runJoin() {
+	ui.joinBtn.Hide()
+	ui.abortBtn.Show()
+	ui.progress.SetValue(0)
+	ui.progress.Hidden = false
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ui.cancel = cancel
+
+	ui.log("Joining: %s", filepath.Base(ui.filePath))
+
+	go func() {
+		joined, err := core.Join(ctx, ui.filePath, func(cur, total int64) {
+			if total > 0 {
+				ui.progress.SetValue(float64(cur) / float64(total))
+			}
+		})
+		if err != nil && ctx.Err() != nil {
+			ui.log("Aborted. Output file removed.")
+		}
+		ui.finishOp(ui.joinBtn, fmt.Sprintf("Joined: %s", filepath.Base(joined)), err)
+	}()
+}
+
+func (ui *appUI) abortOp() {
+	if ui.cancel == nil {
+		return
+	}
+	confirm := dialog.NewConfirm("Abort operation",
+		"Cancel the current operation? Partial files will be removed.",
+		func(ok bool) {
+			if ok {
+				ui.cancel()
+				ui.cancel = nil
+			}
+		}, ui.window)
+	confirm.Show()
+}
+
 func (ui *appUI) finishOp(btn *widget.Button, msg string, err error) {
+	ui.abortBtn.Hide()
+	btn.Show()
+
 	if err != nil {
 		ui.log("Error: %v", err)
 	} else {
@@ -248,6 +333,7 @@ func (ui *appUI) finishOp(btn *widget.Button, msg string, err error) {
 		ui.log(msg)
 	}
 	btn.Enable()
+	ui.cancel = nil
 }
 
 func unitMul(unit string) int64 {
@@ -260,4 +346,14 @@ func unitMul(unit string) int64 {
 		return 1024 * 1024 * 1024
 	}
 	return 1024 * 1024
+}
+
+func fmtBytes(n int64) string {
+	for _, unit := range []string{"B", "KB", "MB", "GB"} {
+		if n < 1024 {
+			return fmt.Sprintf("%d %s", n, unit)
+		}
+		n /= 1024
+	}
+	return fmt.Sprintf("%d TB", n)
 }

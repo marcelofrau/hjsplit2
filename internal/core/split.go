@@ -1,12 +1,13 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 )
 
-func Split(sourcePath string, chunkSize int64, progress func(current, total int64)) ([]string, error) {
+func Split(ctx context.Context, sourcePath string, chunkSize int64, progress func(current, total int64)) ([]string, error) {
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source file: %w", err)
@@ -26,6 +27,13 @@ func Split(sourcePath string, chunkSize int64, progress func(current, total int6
 	done := false
 
 	for !done {
+		select {
+		case <-ctx.Done():
+			cleanupParts(parts)
+			return parts, ctx.Err()
+		default:
+		}
+
 		outPath := fmt.Sprintf("%s.%03d", sourcePath, partNum)
 		outFile, err := os.Create(outPath)
 		if err != nil {
@@ -34,6 +42,15 @@ func Split(sourcePath string, chunkSize int64, progress func(current, total int6
 
 		var written int64
 		for written < chunkSize {
+			select {
+			case <-ctx.Done():
+				outFile.Close()
+				os.Remove(outPath)
+				cleanupParts(parts)
+				return parts, ctx.Err()
+			default:
+			}
+
 			remaining := chunkSize - written
 			readSize := int64(len(buf))
 			if readSize > remaining {
@@ -45,6 +62,7 @@ func Split(sourcePath string, chunkSize int64, progress func(current, total int6
 				if _, werr := outFile.Write(buf[:n]); werr != nil {
 					outFile.Close()
 					os.Remove(outPath)
+					cleanupParts(parts)
 					return parts, fmt.Errorf("failed to write to %s: %w", outPath, werr)
 				}
 				written += int64(n)
@@ -60,6 +78,7 @@ func Split(sourcePath string, chunkSize int64, progress func(current, total int6
 			if readErr != nil {
 				outFile.Close()
 				os.Remove(outPath)
+				cleanupParts(parts)
 				return parts, fmt.Errorf("error reading source: %w", readErr)
 			}
 		}
@@ -79,4 +98,10 @@ func Split(sourcePath string, chunkSize int64, progress func(current, total int6
 	}
 
 	return parts, nil
+}
+
+func cleanupParts(parts []string) {
+	for _, p := range parts {
+		os.Remove(p)
+	}
 }

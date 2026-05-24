@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,7 +20,7 @@ func TestSplitAndJoin(t *testing.T) {
 	}
 
 	chunkSize := int64(256 * 1024)
-	parts, err := Split(originalPath, chunkSize, nil)
+	parts, err := Split(context.Background(), originalPath, chunkSize, nil)
 	if err != nil {
 		t.Fatalf("Split failed: %v", err)
 	}
@@ -30,7 +31,7 @@ func TestSplitAndJoin(t *testing.T) {
 	}
 
 	firstPart := parts[0]
-	joinedPath, err := Join(firstPart, nil)
+	joinedPath, err := Join(context.Background(), firstPart, nil)
 	if err != nil {
 		t.Fatalf("Join failed: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestSplitSmallFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parts, err := Split(path, 1024, nil)
+	parts, err := Split(context.Background(), path, 1024, nil)
 	if err != nil {
 		t.Fatalf("Split failed: %v", err)
 	}

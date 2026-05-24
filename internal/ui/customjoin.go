@@ -127,16 +127,16 @@ func (ui *customJoinUI) build() {
 		ui.abortBtn,
 	)
 
-	// Drop zone (right side)
-	dropLabel := widget.NewLabelWithStyle("⬇\nDrop files here", fyne.TextAlignCenter, fyne.TextStyle{})
-	dropLabel.Wrapping = fyne.TextWrapWord
-	dropZone := widget.NewCard("", "",
-		container.NewCenter(container.NewPadded(dropLabel)))
+	// Drop hint (left side)
+	dropHint := widget.NewLabelWithStyle("Tip: Drag and drop files\nonto this window to add them.", fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
+	dropHint.Wrapping = fyne.TextWrapWord
 
-	// Bottom area: left (buttons) + right (drop zone)
+	// Bottom area: left (drop hint) + right (buttons)
 	bottomRow := container.NewGridWithColumns(2,
-		container.NewHBox(leftCol, layout.NewSpacer()),
-		dropZone)
+		container.NewHBox(dropHint, layout.NewSpacer()),
+		container.NewHBox(layout.NewSpacer(), leftCol),
+		// right-aligned buttons
+	)
 
 	// Main content
 	content := container.NewBorder(
